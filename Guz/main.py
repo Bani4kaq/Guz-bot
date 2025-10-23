@@ -30,6 +30,9 @@ async def on_message(message):
     if "dancho" in message.content.lower():
         await message.channel.send(f"{message.author.mention} W DANCHO")
 
+    if "67" in message.content:
+        await message.reply("https://tenor.com/view/67-67-kid-edit-analog-horror-phonk-gif-3349401281762803381")
+
     await bot.process_commands(message)
 
 
