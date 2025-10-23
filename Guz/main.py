@@ -13,7 +13,7 @@ intents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix='?', intents=intents)
 
-bot_role = "Bots"
+member_role = "member"
 
 
 @bot.event
@@ -41,11 +41,11 @@ async def assign(ctx, member: discord.Member = None):
     if member is None:
         member = ctx.author
 
-    role = discord.utils.get(ctx.guild.roles, name=bot_role)
+    role = discord.utils.get(ctx.guild.roles, name=member_role)
 
     if role:
         await member.add_roles(role)
-        await ctx.send(f"{member.mention} is now {bot_role}")
+        await ctx.send(f"{member.mention} is now {member_role}")
     else:
         await ctx.send("Role doesn't exist")
 
@@ -55,11 +55,11 @@ async def remove(ctx, member: discord.Member = None):
     if member is None:
         member = ctx.author
 
-    role = discord.utils.get(ctx.guild.roles, name=bot_role)
+    role = discord.utils.get(ctx.guild.roles, name=member_role)
 
     if role:
         await member.remove_roles(role)
-        await ctx.send(f"{role.name} role has been removed from {member.mention}")
+        await ctx.send(f"{member_role} role has been removed from {member.mention}")
     else:
         await ctx.send("Role doesn't exist")
 
