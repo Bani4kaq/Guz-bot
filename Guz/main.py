@@ -49,31 +49,71 @@ async def on_message(message):
 
 
 @bot.command()
-async def assign(ctx, member: discord.Member = None):
+@commands.has_permissions(manage_roles=True)
+async def assign(ctx, member: discord.Member = None, *, role_name: str = None):
     if member is None:
         member = ctx.author
 
-    role = discord.utils.get(ctx.guild.roles, name=member_role)
+    if role_name is None:
+        role_name = member_role
 
-    if role:
+    role = discord.utils.get(ctx.guild.roles, name=role_name)
+    if role is None:
+        match = re.match(r"<@&(\d+)>", role_name)
+        if match:
+            role = ctx.guild.get_role(int(match.group(1)))
+
+    if role is None:
+        await ctx.send("Role not found.")
+        return
+
+    try:
         await member.add_roles(role)
-        await ctx.send(f"{member.mention} is now {member_role}")
-    else:
-        await ctx.send("Role doesn't exist")
+        await ctx.send(f"{role.mention} assigned to {member.mention}")
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to assign that role.")
+    except discord.HTTPException as e:
+        await ctx.send(f"Discord API error: {e}")
+
+
+@assign.error
+async def assign_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don’t have permission to use this command (Manage Roles required).")
 
 
 @bot.command()
-async def remove(ctx, member: discord.Member = None):
+@commands.has_permissions(manage_roles=True)
+async def remove(ctx, member: discord.Member = None, *, role_name: str = None):
     if member is None:
         member = ctx.author
 
-    role = discord.utils.get(ctx.guild.roles, name=member_role)
+    if role_name is None:
+        role_name = member_role
 
-    if role:
+    role = discord.utils.get(ctx.guild.roles, name=role_name)
+    if role is None:
+        match = re.match(r"<@&(\d+)>", role_name)
+        if match:
+            role = ctx.guild.get_role(int(match.group(1)))
+
+    if role is None:
+        await ctx.send("Role not found.")
+        return
+
+    try:
         await member.remove_roles(role)
-        await ctx.send(f"{member_role} role has been removed from {member.mention}")
-    else:
-        await ctx.send("Role doesn't exist")
+        await ctx.send(f"Removed {role.mention} from {member.mention}")
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to remove that role.")
+    except discord.HTTPException as e:
+        await ctx.send(f"Something went wrong: {e}")
+
+
+@remove.error
+async def remove_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don’t have permission to use this command (Manage Roles required).")
 
 
 @bot.command()
@@ -99,6 +139,7 @@ async def choose(ctx, *, options):
 
 
 @bot.command()
+@commands.has_permissions(manage_messages=True)
 async def mpurge(ctx, amount: int):
     if amount < 1:
         await ctx.reply("Please provide a number greater than 0.")
@@ -111,6 +152,12 @@ async def mpurge(ctx, amount: int):
 
     confirmation = await ctx.send(f"Deleted {len(deleted) - 1} messages.")
     await confirmation.delete(delay=3)
+
+
+@mpurge.error
+async def mpurge_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don’t have permission to use this command (Manage Messages required).")
 
 
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
