@@ -6,6 +6,7 @@ import os
 import re
 import random
 import shlex
+import asyncio
 from datetime import timedelta
 
 load_dotenv()
@@ -160,20 +161,77 @@ async def mpurge_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.reply("You don’t have permission to use this command (Manage Messages required).")
 
+
 @bot.command()
 @commands.has_permissions(moderate_members=True)
 async def mute(ctx, member: discord.Member, minutes: int, *, reason: str):
-    try:
-        timeout_duration = timedelta(minutes=minutes)
-        await member.timeout(timeout_duration, reason=reason)
-        await ctx.send(f"{member.mention} has been timed out for {minutes} minutes. Reason: {reason}")
-    except Exception as e:
-        await ctx.send(f"An error occurred: {e}")
+    timeout_duration = timedelta(minutes=minutes)
+    await member.timeout(timeout_duration, reason=reason)
+
+    embed = discord.Embed(
+        title=f"{member.display_name} has been muted",
+        color=discord.Color.red()
+    )
+    embed.add_field(name="Reason", value=reason, inline=False)
+    embed.add_field(name="Duration", value=f"{minutes} minutes", inline=False)
+    embed.set_footer(text=f"Muted by {ctx.author.display_name}")
+
+    await ctx.send(embed=embed)
+
 
 @mute.error
 async def mute_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.reply("You don’t have permission to use this command (Timeout Memembers required).")
+
+
+@bot.command(aliases=['rm'])
+async def reminder(ctx, time: str = None, *, text: str = None):
+    if time is None:
+        await ctx.reply("Please specify a duration (e.g. `?rm 10m`, `?rm 2h`, or `?rm 1d`).")
+        return
+
+    if text is None:
+        text = "something"
+
+    match = re.match(r"^(\d+)([mhd])$", time.lower())
+    if not match:
+        await ctx.reply("Invalid time format. Use something like `10m`, `2h`, or `1d`.")
+        return
+
+    amount, unit = match.groups()
+    amount = int(amount)
+
+    delay = 0
+    unit_full = ""
+
+    if unit == "m":
+        delay = amount * 60
+        unit_full = "minute" if amount == 1 else "minutes"
+    elif unit == "h":
+        delay = amount * 60 * 60
+        unit_full = "hour" if amount == 1 else "hours"
+    elif unit == "d":
+        delay = amount * 60 * 60 * 24
+        unit_full = "day" if amount == 1 else "days"
+    else:
+        await ctx.reply("Invalid time unit. Use m, h, or d.")
+        return
+
+    embed = discord.Embed(
+        title="Reminder Set",
+        description=f"{ctx.author.mention}, I will remind you in **{amount} {unit_full}** about **{text}**.",
+        color=discord.Color.green()
+    )
+    embed.set_footer(text="Reminder bot")
+    await ctx.send(embed=embed)
+
+    await asyncio.sleep(delay)
+
+    try:
+        await ctx.author.send(f"Hey, you asked me to remind you about {text}.")
+    except discord.Forbidden:
+        await ctx.send(f"{ctx.author.mention}, I couldn’t DM you your reminder (your DMs might be closed).")
 
 
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
