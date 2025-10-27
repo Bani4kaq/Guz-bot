@@ -6,6 +6,7 @@ import os
 import re
 import random
 import shlex
+from datetime import timedelta
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
@@ -21,7 +22,7 @@ member_role = "member"
 
 @bot.event
 async def on_ready():
-    print(f"We are ready to go in, {bot.user.name}")
+    print("It's adventure time!")
 
 
 @bot.event
@@ -148,7 +149,7 @@ async def mpurge(ctx, amount: int):
         await ctx.reply("You can only delete up to 100 messages at once.")
         return
 
-    deleted = await ctx.channel.purge(limit=amount)
+    deleted = await ctx.channel.purge(limit=1 + amount)
 
     confirmation = await ctx.send(f"Deleted {len(deleted) - 1} messages.")
     await confirmation.delete(delay=3)
@@ -163,10 +164,8 @@ async def mpurge_error(ctx, error):
 @commands.has_permissions(moderate_members=True)
 async def mute(ctx, member: discord.Member, minutes: int, *, reason: str):
     try:
-        timeout_duration = minutes * 60
-
-        await member.timeout(duration=timeout_duration, reason=reason)
-
+        timeout_duration = timedelta(minutes=minutes)
+        await member.timeout(timeout_duration, reason=reason)
         await ctx.send(f"{member.mention} has been timed out for {minutes} minutes. Reason: {reason}")
     except Exception as e:
         await ctx.send(f"An error occurred: {e}")
