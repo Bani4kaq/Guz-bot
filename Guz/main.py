@@ -234,4 +234,33 @@ async def reminder(ctx, time: str = None, *, text: str = None):
         await ctx.send(f"{ctx.author.mention}, I couldn’t DM you your reminder (your DMs might be closed).")
 
 
+@bot.command()
+@commands.has_permissions(moderate_members=True)
+async def unmute(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+    try:
+        await member.timeout(None, reason=reason)
+
+        embed = discord.Embed(
+            title=f"{member.display_name} has been unmuted",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.set_footer(text=f"Unmuted by {ctx.author.display_name}")
+
+        await ctx.send(embed=embed)
+
+    except discord.Forbidden:
+        await ctx.reply("I don't have permission to unmute that user.")
+    except discord.HTTPException as e:
+        await ctx.reply(f"Something went wrong while unmuting: {e}")
+
+
+@unmute.error
+async def unmute_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You don’t have permission to use this command (Timeout Members required).")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.reply("Usage: `?unmute @user [reason]`")
+
+
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
