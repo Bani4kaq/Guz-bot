@@ -262,4 +262,148 @@ async def reminder(ctx, time: str = None, *, text: str = None):
     except discord.Forbidden:
         await ctx.send(f"{ctx.author.mention}, I couldn’t DM you your reminder (your DMs might be closed).")
 
+
+class ChannelNameModal(discord.ui.Modal, title="Edit Channel Name"):
+    name = discord.ui.TextInput(
+        label="Channel Name",
+        placeholder="Letters and numbers only",
+        max_length=50
+    )
+
+    def __init__(self, view):
+        super().__init__()
+        self.view_ref = view
+
+    async def on_submit(self, interaction: discord.Interaction, /):
+        if not re.fullmatch(r"[A-Za-z0-9 ]+", self.name.value):
+            await interaction.response.send_message(
+                "❌ Channel name can only contain letters and numbers.",
+                ephemeral=True
+            )
+            return
+
+        self.view_ref.channel_name = self.name.value
+        await interaction.response.edit_message(
+            embed=self.view_ref.build_embed(),
+            view=self.view_ref
+        )
+
+
+class UserLimitModal(discord.ui.Modal, title="Edit User Limit"):
+    limit = discord.ui.TextInput(
+        label="User Limit (1–10)",
+        placeholder="Enter a number",
+        max_length=2
+    )
+
+    def __init__(self, view):
+        super().__init__()
+        self.view_ref = view
+
+    async def on_submit(self, interaction: discord.Interaction, /):
+        if not self.limit.value.isdigit():
+            await interaction.response.send_message(
+                "❌ User limit must be a number.",
+                ephemeral=True
+            )
+            return
+
+        value = int(self.limit.value)
+        if value < 1 or value > 10:
+            await interaction.response.send_message(
+                "❌ User limit must be between 1 and 10.",
+                ephemeral=True
+            )
+            return
+
+        self.view_ref.user_limit = str(value)
+        await interaction.response.edit_message(
+            embed=self.view_ref.build_embed(),
+            view=self.view_ref
+        )
+
+
+class PrivacySelect(discord.ui.Select):
+    def __init__(self, view):
+        self.view_ref = view
+        options = [
+            discord.SelectOption(label="Public", emoji="🔓"),
+            discord.SelectOption(label="Private", emoji="🔒")
+        ]
+        super().__init__(placeholder="Select privacy", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        self.view_ref.privacy = self.values[0]
+        await interaction.response.edit_message(
+            embed=self.view_ref.build_embed(),
+            view=self.view_ref
+        )
+
+
+class VCCreationView(discord.ui.View):
+    def __init__(self, author: discord.Member):
+        super().__init__(timeout=120)
+        self.author = author
+
+        self.channel_name = f"{author.name}'s VC"
+        self.user_limit = "Unlimited"
+        self.privacy = "Public"
+
+        self.add_item(PrivacySelect(self))
+
+    async def interaction_check(self, interaction: discord.Interaction, /) -> bool:
+        return interaction.user == self.author
+
+    def build_embed(self):
+        embed = discord.Embed(
+            title="Temporary Voice Channel",
+            description=(
+                "Customize your temporary voice channel below.\n"
+                "It will be deleted automatically when everyone leaves."
+            ),
+            color=discord.Color.blurple()
+        )
+
+        embed.add_field(
+            name="🏷️ Channel Name",
+            value=self.channel_name,
+            inline=False
+        )
+
+        embed.add_field(
+            name="👥 User Limit",
+            value=self.user_limit,
+            inline=False
+        )
+
+        embed.add_field(
+            name="🔒 Privacy",
+            value=self.privacy,
+            inline=False
+        )
+
+        embed.set_footer(text="Use the buttons below to edit these options.")
+        return embed
+
+    @discord.ui.button(label="Edit Name", style=discord.ButtonStyle.primary)
+    async def edit_name(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        await interaction.response.send_modal(ChannelNameModal(self))
+
+    @discord.ui.button(label="Edit User Limit", style=discord.ButtonStyle.primary)
+    async def edit_limit(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        await interaction.response.send_modal(UserLimitModal(self))
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
+    async def confirm(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        await interaction.response.send_message(
+            "✅ Confirm pressed (no functionality yet).",
+            ephemeral=True
+        )
+
+
+@bot.command(name="vc", aliases=["voice", "voicechannel"])
+async def vc(ctx: commands.Context):
+    view = VCCreationView(ctx.author)
+    await ctx.send(embed=view.build_embed(), view=view)
+
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
