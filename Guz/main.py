@@ -345,9 +345,12 @@ class VCCreationView(discord.ui.View):
         super().__init__(timeout=120)
         self.author = author
 
+        # State
         self.channel_name = f"{author.name}'s VC"
         self.user_limit = "Unlimited"
         self.privacy = "Public"
+        self.created_channel = None
+        self._bot_loop_task = None
 
         self.add_item(PrivacySelect(self))
 
@@ -364,24 +367,11 @@ class VCCreationView(discord.ui.View):
             color=discord.Color.blurple()
         )
 
-        embed.add_field(
-            name="🏷️ Channel Name",
-            value=self.channel_name,
-            inline=False
-        )
-
-        embed.add_field(
-            name="👥 User Limit",
-            value=self.user_limit,
-            inline=False
-        )
-
-        embed.add_field(
-            name="🔒 Privacy",
-            value=self.privacy,
-            inline=False
-        )
-
+        embed.add_field(name="🏷️ Channel Name",
+                        value=self.channel_name, inline=False)
+        embed.add_field(name="👥 User Limit",
+                        value=self.user_limit, inline=False)
+        embed.add_field(name="🔒 Privacy", value=self.privacy, inline=False)
         embed.set_footer(text="Use the buttons below to edit these options.")
         return embed
 
@@ -395,10 +385,42 @@ class VCCreationView(discord.ui.View):
 
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        limit = 0 if self.user_limit == "Unlimited" else int(self.user_limit)
+
+        overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(
+                connect=self.privacy == "Public")
+        }
+
+        category = interaction.channel.category
+        self.created_channel = await interaction.guild.create_voice_channel(
+            name=self.channel_name,
+            overwrites=overwrites,
+            user_limit=limit,
+            category=category,
+            reason=f"Temporary VC created by {interaction.user}"
+        )
+
         await interaction.response.send_message(
-            "✅ Confirm pressed (no functionality yet).",
+            f"✅ Temporary voice channel **{self.created_channel.name}** created!",
             ephemeral=True
         )
+
+        self._bot_loop_task = asyncio.create_task(
+            self._wait_for_empty_and_delete())
+
+    async def _wait_for_empty_and_delete(self):
+        if not self.created_channel:
+            return
+
+        while True:
+            await asyncio.sleep(10)
+            if len(self.created_channel.members) == 0:
+                try:
+                    await self.created_channel.delete(reason="Temporary VC empty")
+                except discord.HTTPException:
+                    pass
+                break
 
 
 @bot.command(name="vc", aliases=["voice", "voicechannel"])
